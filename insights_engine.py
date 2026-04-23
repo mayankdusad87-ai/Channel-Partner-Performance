@@ -11,7 +11,7 @@ def generate_insights(summary, monthly, active_cp):
     client = Groq(api_key=api_key)
 
     prompt = f"""
-You are a real estate sale stratgeist having work experience of 20 years with Lodha, Rustomjee.
+You are a real estate sourcing performance analyst.
 
 Analyze the data:
 
@@ -29,13 +29,13 @@ Give:
 - Trends
 - Actionable recommendations
 
-Be sharp, use numbers, and business language.
+Use numbers and keep it business-focused.
 """
 
     response = client.chat.completions.create(
         model="llama3-70b-8192",
         messages=[
-            {"role": "system", "content": "You are a real estate strategist."},
+            {"role": "system", "content": "You are a business analyst."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.3
