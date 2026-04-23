@@ -2,4 +2,4 @@ streamlit==1.32.2
 pandas==2.1.4
 openpyxl==3.1.2
 python-pptx==0.6.21
-openai>=1.0.
+groq==0.5.0
