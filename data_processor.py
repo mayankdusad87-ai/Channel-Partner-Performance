@@ -21,42 +21,23 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
-    # ---------------- DATE CLEANING ----------------
+    # ---------------- STRING CLEANING ----------------
+    df[visit_col] = df[visit_col].fillna("").astype(str).str.lower().str.strip()
+    df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
+    df[affinity_col] = df[affinity_col].fillna("").astype(str).str.lower().str.strip()
+
+    # ---------------- DATE PARSING (SAFE) ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
 
-    # ⚠️ Drop only invalid dates
-    df = df.dropna(subset=["Date"])
+    # 👉 Split data:
+    df_valid_dates = df[df["Date"].notna()].copy()   # for monthly
+    df_all = df.copy()                               # for CP analysis (NO DROPS)
 
-    # ---------------- STRING CLEANING ----------------
-    df[visit_col] = (
-        df[visit_col]
-        .fillna("")
-        .astype(str)
-        .str.lower()
-        .str.strip()
-    )
+    # ---------------- MONTH (ONLY VALID DATES) ----------------
+    df_valid_dates["Month"] = df_valid_dates["Date"].dt.to_period("M").astype(str)
 
-    df[booking_col] = (
-        df[booking_col]
-        .fillna("")
-        .astype(str)
-        .str.upper()
-        .str.strip()
-    )
-
-    df[affinity_col] = (
-        df[affinity_col]
-        .fillna("")
-        .astype(str)
-        .str.lower()
-        .str.strip()
-    )
-
-    # ---------------- MONTH ----------------
-    df["Month"] = df["Date"].dt.to_period("M").astype(str)
-
-    # ---------------- FUNNEL (FIXED LOGIC) ----------------
-    cp_funnel = df.groupby(cp_col).agg(
+    # ---------------- FUNNEL (USE FULL DATA) ----------------
+    cp_funnel = df_all.groupby(cp_col).agg(
         Fresh_Walkins=(visit_col, lambda x: (x == "first visit").sum()),
         Revisits=(visit_col, lambda x: (x == "revisit").sum()),
         Hot=(affinity_col, lambda x: (x == "hot").sum()),
@@ -65,7 +46,6 @@ def process_data(df):
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
-    # ---------------- CONVERSION ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
@@ -75,8 +55,8 @@ def process_data(df):
     # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
-    # ---------------- MONTHLY ----------------
-    monthly = df.groupby("Month").agg(
+    # ---------------- MONTHLY (ONLY VALID DATES) ----------------
+    monthly = df_valid_dates.groupby("Month").agg(
         Fresh=("Date", "count"),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
@@ -87,8 +67,16 @@ def process_data(df):
 
     monthly = monthly.round(2)
 
-    # ---------------- ACTIVE CP ----------------
-    last_30 = df[df["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)]
+    # ---------------- ACTIVE CP (ONLY VALID DATES) ----------------
+    last_30 = df_valid_dates[
+        df_valid_dates["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)
+    ]
+
     active_cp = last_30[cp_col].nunique()
+
+    # ---------------- DATA QUALITY WARNING ----------------
+    invalid_dates = df["Date"].isna().sum()
+    if invalid_dates > 0:
+        print(f"⚠️ {invalid_dates} rows had invalid dates (excluded from monthly, included in CP analysis)")
 
     return summary, monthly, cp_funnel, active_cp
