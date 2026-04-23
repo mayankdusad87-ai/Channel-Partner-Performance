@@ -4,9 +4,9 @@ from data_processor import process_data
 from insights_engine import generate_insights
 from report_generator import create_ppt
 
-st.title("🏢 Broker Performance AI (Clean Version)")
+st.title("🏢 Channel Partner Performance AI")
 
-file = st.file_uploader("Upload Excel", type=["xlsx"])
+file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if file:
     df = pd.read_excel(file)
@@ -23,8 +23,11 @@ if file:
 
     if st.button("Generate AI Insights"):
         insights = generate_insights(summary, monthly, active_cp)
+
+        st.subheader("🧠 Insights")
         st.write(insights)
 
         ppt = create_ppt(insights, summary, monthly)
+
         with open(ppt, "rb") as f:
-            st.download_button("Download PPT", f, file_name="report.pptx")
+            st.download_button("Download PPT", f, file_name="broker_report.pptx")
