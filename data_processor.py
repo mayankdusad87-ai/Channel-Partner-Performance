@@ -1,25 +1,39 @@
 import pandas as pd
 
-def find_column(df, keyword):
+def normalize(text):
+    return text.lower().replace("*", "").replace("(", "").replace(")", "").strip()
+
+def find_column(df, keywords):
     for col in df.columns:
-        if keyword.lower() in col.lower():
-            return col
+        col_norm = normalize(col)
+        for key in keywords:
+            if key in col_norm:
+                return col
     return None
 
 
 def process_data(df):
     # Clean column names
     df.columns = df.columns.str.strip()
-    df.columns = df.columns.str.replace("*", "", regex=False)
 
-    # Detect columns dynamically
-    date_col = find_column(df, "Date of Visit")
-    visit_col = find_column(df, "Visit type")
-    cp_col = find_column(df, "Channel Partner Company")
-    booking_col = find_column(df, "Booking Done")
+    # Debug (IMPORTANT – remove later)
+    print("Columns found:", df.columns.tolist())
 
-    if not all([date_col, visit_col, cp_col, booking_col]):
-        raise Exception("❌ Required columns not found. Please check Excel format.")
+    # Flexible column detection
+    date_col = find_column(df, ["date of visit"])
+    visit_col = find_column(df, ["visit type"])
+    cp_col = find_column(df, ["channel partner company"])
+    booking_col = find_column(df, ["booking done"])
+
+    # Fail-safe fallback (very important)
+    if not date_col:
+        raise Exception(f"❌ Date column not found. Available columns: {df.columns.tolist()}")
+    if not visit_col:
+        raise Exception(f"❌ Visit type column not found. Available columns: {df.columns.tolist()}")
+    if not cp_col:
+        raise Exception(f"❌ Channel Partner column not found. Available columns: {df.columns.tolist()}")
+    if not booking_col:
+        raise Exception(f"❌ Booking column not found. Available columns: {df.columns.tolist()}")
 
     # Convert date
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
@@ -27,10 +41,14 @@ def process_data(df):
     # Create Month
     df["Month"] = df["Date"].dt.to_period("M")
 
+    # Standardize values (VERY IMPORTANT)
+    df[visit_col] = df[visit_col].astype(str).str.strip().str.lower()
+    df[booking_col] = df[booking_col].astype(str).str.strip().str.upper()
+
     # Overall Summary
     summary = df.groupby(cp_col).agg(
-        Fresh_Walkins=(visit_col, lambda x: (x == "First Visit").sum()),
-        Revisits=(visit_col, lambda x: (x == "Revisit").sum()),
+        Fresh_Walkins=(visit_col, lambda x: (x.str.contains("first")).sum()),
+        Revisits=(visit_col, lambda x: (x.str.contains("revisit")).sum()),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
@@ -39,8 +57,8 @@ def process_data(df):
 
     # Monthly Summary
     monthly = df.groupby("Month").agg(
-        Fresh=(visit_col, lambda x: (x == "First Visit").sum()),
-        Revisits=(visit_col, lambda x: (x == "Revisit").sum()),
+        Fresh=(visit_col, lambda x: (x.str.contains("first")).sum()),
+        Revisits=(visit_col, lambda x: (x.str.contains("revisit")).sum()),
         Bookings=(booking_col, lambda x: (x == "Y").sum()),
         Active_CPs=(cp_col, "nunique")
     ).reset_index()
@@ -49,6 +67,6 @@ def process_data(df):
 
     # Last 30 Days Active CP
     last_30 = df[df["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)]
-    active_cp = last_30[last_30[visit_col] == "First Visit"][cp_col].nunique()
+    active_cp = last_30[last_30[visit_col].str.contains("first")][cp_col].nunique()
 
     return summary, monthly, active_cp
