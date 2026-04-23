@@ -9,16 +9,17 @@ st.title("🏢 Channel Partner Performance AI")
 file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if file:
-    # 🔥 READ SPECIFIC SHEET
     try:
-        df = pd.read_excel(file, sheet_name="CIF")
-    except Exception:
-        st.error("❌ 'CIF' sheet not found. Please upload correct file.")
-        st.stop()
+        excel = pd.ExcelFile(file)
 
-    st.success("✅ CIF sheet loaded successfully")
+        if "CIF" not in excel.sheet_names:
+            st.error(f"❌ CIF sheet not found. Available sheets: {excel.sheet_names}")
+            st.stop()
 
-    try:
+        df = pd.read_excel(excel, sheet_name="CIF")
+
+        st.success("✅ CIF sheet loaded successfully")
+
         summary, monthly, active_cp = process_data(df)
 
         st.subheader("📊 Overall Summary")
