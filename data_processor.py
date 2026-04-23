@@ -2,7 +2,8 @@ import pandas as pd
 
 def process_data(df):
 
-    # Clean column names
+    # ---------------- CLEAN COLUMN NAMES ----------------
+    df.columns = df.columns.fillna("").astype(str)
     df.columns = df.columns.str.strip()
 
     # ---------------- COLUMN DETECTION ----------------
@@ -12,7 +13,7 @@ def process_data(df):
     booking_col = None
 
     for col in df.columns:
-        col_lower = col.lower()
+        col_lower = str(col).lower()
 
         if "date of visit" in col_lower:
             date_col = col
@@ -39,7 +40,7 @@ def process_data(df):
     if not booking_col:
         raise Exception("❌ Booking column not found")
 
-    # ---------------- CLEAN DATA ----------------
+    # ---------------- DATA CLEANING ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Date"])
 
@@ -48,7 +49,7 @@ def process_data(df):
     df[visit_col] = df[visit_col].fillna("").astype(str).str.lower().str.strip()
     df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
 
-    # ---------------- OVERALL ----------------
+    # ---------------- OVERALL SUMMARY ----------------
     summary = df.groupby(cp_col).agg(
         Fresh_Walkins=(visit_col, lambda x: x.astype(str).str.contains("first", na=False).sum()),
         Revisits=(visit_col, lambda x: x.astype(str).str.contains("revisit", na=False).sum()),
@@ -62,7 +63,7 @@ def process_data(df):
 
     summary = summary.round(2)
 
-    # ---------------- MONTHLY ----------------
+    # ---------------- MONTHLY SUMMARY ----------------
     monthly = df.groupby("Month").agg(
         Fresh=(visit_col, lambda x: x.astype(str).str.contains("first", na=False).sum()),
         Revisits=(visit_col, lambda x: x.astype(str).str.contains("revisit", na=False).sum()),
