@@ -41,7 +41,7 @@ if file:
             top = top.sort_values(by="Score", ascending=False).head(10)
 
             st.subheader("Top Channel Partners")
-            st.dataframe(top)
+            st.dataframe(top.reset_index(drop=True))
 
         # ---------------- MONTHLY ----------------
         with tabs[1]:
