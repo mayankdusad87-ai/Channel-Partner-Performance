@@ -2,7 +2,7 @@ import pandas as pd
 
 def process_data(df):
 
-    # ---------------- CLEAN COLUMNS ----------------
+    # ---------------- CLEAN COLUMN NAMES ----------------
     df.columns = df.columns.fillna("").astype(str).str.strip()
 
     def find(name):
@@ -21,33 +21,58 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
-    # ---------------- CLEAN DATA ----------------
+    # ---------------- DATE CLEANING ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
+
+    # ⚠️ Drop only invalid dates
     df = df.dropna(subset=["Date"])
 
+    # ---------------- STRING CLEANING ----------------
+    df[visit_col] = (
+        df[visit_col]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+        .str.strip()
+    )
+
+    df[booking_col] = (
+        df[booking_col]
+        .fillna("")
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    df[affinity_col] = (
+        df[affinity_col]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+        .str.strip()
+    )
+
+    # ---------------- MONTH ----------------
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    df[visit_col] = df[visit_col].fillna("").astype(str).str.lower()
-    df[booking_col] = df[booking_col].fillna("").astype(str).str.upper()
-    df[affinity_col] = df[affinity_col].fillna("").astype(str).str.lower()
-
-    # ---------------- FUNNEL TABLE ----------------
+    # ---------------- FUNNEL (FIXED LOGIC) ----------------
     cp_funnel = df.groupby(cp_col).agg(
-        Fresh_Walkins=(visit_col, lambda x: x.str.contains("first", na=False).sum()),
-        Hot=(affinity_col, lambda x: x.str.contains("hot", na=False).sum()),
-        Warm=(affinity_col, lambda x: x.str.contains("warm", na=False).sum()),
-        Cold=(affinity_col, lambda x: x.str.contains("cold", na=False).sum()),
-        Revisits=(visit_col, lambda x: x.str.contains("revisit", na=False).sum()),
+        Fresh_Walkins=(visit_col, lambda x: (x == "first visit").sum()),
+        Revisits=(visit_col, lambda x: (x == "revisit").sum()),
+        Hot=(affinity_col, lambda x: (x == "hot").sum()),
+        Warm=(affinity_col, lambda x: (x == "warm").sum()),
+        Cold=(affinity_col, lambda x: (x == "cold").sum()),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
+    # ---------------- CONVERSION ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
 
     cp_funnel = cp_funnel.round(2)
 
-    # ---------------- SUMMARY (USED FOR SCORING) ----------------
+    # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
     # ---------------- MONTHLY ----------------
