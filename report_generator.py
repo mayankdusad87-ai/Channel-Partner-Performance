@@ -1,21 +1,20 @@
 from pptx import Presentation
 from datetime import datetime
 
-
 def create_ppt(insights, summary, monthly):
     prs = Presentation()
 
-    # Title Slide
+    # Slide 1: Title
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "Broker Performance Report"
+    slide.shapes.title.text = "Channel Partner Performance Report"
     slide.placeholders[1].text = str(datetime.now().date())
 
-    # Insights Slide
+    # Slide 2: Insights
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Insights"
+    slide.shapes.title.text = "Key Insights"
     slide.placeholders[1].text = insights
 
-    file = "broker_report.pptx"
+    file = "report.pptx"
     prs.save(file)
 
     return file
