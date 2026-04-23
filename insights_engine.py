@@ -1,29 +1,34 @@
 import os
 from groq import Groq
 
-def generate_insights(summary, monthly, active_cp):
+def generate_insights(summary, monthly, cp_funnel):
 
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     prompt = f"""
-You are a real estate strategy consultant.
+You are a senior real estate sourcing strategist working with Lodha group
 
-Analyze:
+DATA:
 
-OVERALL:
-{summary.to_string(index=False)}
+FUNNEL PERFORMANCE:
+{cp_funnel.to_string(index=False)}
 
-MONTHLY:
+MONTHLY PERFORMANCE:
 {monthly.to_string(index=False)}
 
-Active CPs: {active_cp}
+Analyze deeply:
 
-Give:
-1. Key insights
-2. Risks
-3. Top performers (why)
-4. Poor performers (why)
-5. Actions sourcing head must take
+1. Which CPs are top performers and WHY
+2. Which CPs are underperforming and WHY
+3. Role of Hot/Warm/Cold mix in performance
+4. Any inefficiencies in conversion funnel
+5. Dependency risks in CP network
+
+Give output in this format:
+
+- Key Insights
+- Risks
+- Recommended Actions (very specific, actionable)
 """
 
     response = client.chat.completions.create(
