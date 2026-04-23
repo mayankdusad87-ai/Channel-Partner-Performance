@@ -1,46 +1,37 @@
 import pandas as pd
 
+def find_col(df, keyword):
+    for col in df.columns:
+        if keyword in str(col).lower():
+            return col
+    return None
+
+
 def process_data(df):
 
-    # ---------------- CLEAN COLUMN NAMES ----------------
+    # Clean columns
     df.columns = df.columns.fillna("").astype(str)
     df.columns = df.columns.str.strip()
 
-    # ---------------- COLUMN DETECTION ----------------
-    date_col = None
-    visit_col = None
-    cp_col = None
-    booking_col = None
+    print("Columns:", df.columns.tolist())
 
-    for col in df.columns:
-        col_lower = str(col).lower()
+    # 🔥 SAFE COLUMN DETECTION
+    date_col = find_col(df, "date of visit")
+    visit_col = find_col(df, "visit type")
+    cp_col = find_col(df, "channel partner")
+    booking_col = find_col(df, "booking done")
 
-        if "date of visit" in col_lower:
-            date_col = col
-
-        if "visit type" in col_lower:
-            visit_col = col
-
-        if "channel partner company" in col_lower:
-            cp_col = col
-
-        if "booking done" in col_lower:
-            booking_col = col
-
-    # ---------------- VALIDATION ----------------
+    # Validation
     if not date_col:
         raise Exception("❌ Date column not found")
-
     if not visit_col:
         raise Exception("❌ Visit type column not found")
-
     if not cp_col:
         raise Exception("❌ Channel Partner column not found")
-
     if not booking_col:
         raise Exception("❌ Booking column not found")
 
-    # ---------------- DATA CLEANING ----------------
+    # Clean data
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["Date"])
 
@@ -49,7 +40,7 @@ def process_data(df):
     df[visit_col] = df[visit_col].fillna("").astype(str).str.lower().str.strip()
     df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
 
-    # ---------------- OVERALL SUMMARY ----------------
+    # ---------------- SUMMARY ----------------
     summary = df.groupby(cp_col).agg(
         Fresh_Walkins=(visit_col, lambda x: x.astype(str).str.contains("first", na=False).sum()),
         Revisits=(visit_col, lambda x: x.astype(str).str.contains("revisit", na=False).sum()),
@@ -63,7 +54,7 @@ def process_data(df):
 
     summary = summary.round(2)
 
-    # ---------------- MONTHLY SUMMARY ----------------
+    # ---------------- MONTHLY ----------------
     monthly = df.groupby("Month").agg(
         Fresh=(visit_col, lambda x: x.astype(str).str.contains("first", na=False).sum()),
         Revisits=(visit_col, lambda x: x.astype(str).str.contains("revisit", na=False).sum()),
