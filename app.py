@@ -18,7 +18,7 @@ if file:
 
         df = pd.read_excel(excel, sheet_name="CIF")
 
-        st.success("✅ CIF sheet loaded successfully")
+        st.success("✅ CIF sheet loaded")
 
         summary, monthly, active_cp = process_data(df)
 
@@ -36,7 +36,7 @@ if file:
             st.subheader("🧠 Insights")
             st.write(insights)
 
-            ppt = create_ppt(insights, summary, monthly)
+            ppt = create_ppt(insights)
 
             with open(ppt, "rb") as f:
                 st.download_button("Download PPT", f, file_name="CP_Report.pptx")
