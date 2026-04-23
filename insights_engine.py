@@ -13,7 +13,7 @@ def generate_insights(summary, monthly, active_cp):
     prompt = f"""
 You are a real estate sourcing performance analyst.
 
-Analyze the data:
+Analyze:
 
 OVERALL:
 {summary.to_string(index=False)}
