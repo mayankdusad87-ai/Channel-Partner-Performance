@@ -1,72 +1,62 @@
 import pandas as pd
-import re
 
-# ---------------- NORMALIZATION ----------------
-def normalize(text):
-    text = str(text).lower()
-    text = re.sub(r'[^a-z0-9 ]', ' ', text)  # remove special chars
-    text = re.sub(r'\s+', ' ', text)         # remove extra spaces
-    return text.strip()
-
-# ---------------- COLUMN FINDER ----------------
-def find_column(df, keywords):
-    for col in df.columns:
-        col_norm = normalize(col)
-        for key in keywords:
-            if key in col_norm:
-                return col
-    return None
-
-
-# ---------------- MAIN FUNCTION ----------------
 def process_data(df):
 
-    # Clean column names
+    # Clean columns
     df.columns = df.columns.str.strip()
 
-    # DEBUG (keep for now)
     print("Columns found:", df.columns.tolist())
 
-    # ---------------- DETECT COLUMNS ----------------
-    date_col = find_column(df, ["date visit", "visit date", "date"])
-    visit_col = find_column(df, ["visit type"])
-    cp_col = find_column(df, ["channel partner"])
-    booking_col = find_column(df, ["booking done", "booking"])
+    # ---------------- EXACT COLUMN MAPPING ----------------
+    date_col = None
+    visit_col = None
+    cp_col = None
+    booking_col = None
+
+    for col in df.columns:
+        col_lower = col.lower()
+
+        if "date of visit" in col_lower:
+            date_col = col
+
+        if "visit type" in col_lower:
+            visit_col = col
+
+        if "channel partner company" in col_lower:
+            cp_col = col
+
+        if "booking done" in col_lower:
+            booking_col = col
 
     # ---------------- VALIDATION ----------------
     if not date_col:
         raise Exception(f"❌ Date column not found. Columns: {df.columns.tolist()}")
 
     if not visit_col:
-        raise Exception(f"❌ Visit type column not found. Columns: {df.columns.tolist()}")
+        raise Exception("❌ Visit type column not found")
 
     if not cp_col:
-        raise Exception(f"❌ Channel Partner column not found. Columns: {df.columns.tolist()}")
+        raise Exception("❌ Channel Partner column not found")
 
     if not booking_col:
-        raise Exception(f"❌ Booking column not found. Columns: {df.columns.tolist()}")
+        raise Exception("❌ Booking column not found")
 
-    # ---------------- DATE PROCESSING ----------------
+    # ---------------- PROCESSING ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
-
-    # Drop invalid dates
     df = df.dropna(subset=["Date"])
 
-    # ---------------- MONTH ----------------
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    # ---------------- STANDARDIZE VALUES ----------------
     df[visit_col] = df[visit_col].astype(str).str.lower().str.strip()
     df[booking_col] = df[booking_col].astype(str).str.upper().str.strip()
 
-    # ---------------- OVERALL SUMMARY ----------------
+    # ---------------- OVERALL ----------------
     summary = df.groupby(cp_col).agg(
         Fresh_Walkins=(visit_col, lambda x: x.str.contains("first").sum()),
         Revisits=(visit_col, lambda x: x.str.contains("revisit").sum()),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
-    # Avoid division errors
     summary["Fresh_Walkins"] = summary["Fresh_Walkins"].replace(0, 1)
 
     summary["Conversion %"] = (summary["Bookings"] / summary["Fresh_Walkins"]) * 100
@@ -74,7 +64,7 @@ def process_data(df):
 
     summary = summary.round(2)
 
-    # ---------------- MONTHLY SUMMARY ----------------
+    # ---------------- MONTHLY ----------------
     monthly = df.groupby("Month").agg(
         Fresh=(visit_col, lambda x: x.str.contains("first").sum()),
         Revisits=(visit_col, lambda x: x.str.contains("revisit").sum()),
