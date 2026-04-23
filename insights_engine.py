@@ -2,17 +2,18 @@ import os
 from groq import Groq
 
 def generate_insights(summary, monthly, active_cp):
+
     api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
-        return "⚠️ Please add GROQ_API_KEY in Streamlit Secrets"
+        return "⚠️ Please set GROQ_API_KEY in Streamlit Secrets"
 
     client = Groq(api_key=api_key)
 
     prompt = f"""
-You are a senior real estate strategist having 20 years work experienc in Lodha, Rustomjee etc..
+You are a real estate sale stratgeist having work experience of 20 years with Lodha, Rustomjee.
 
-Analyze the data below:
+Analyze the data:
 
 OVERALL:
 {summary.to_string(index=False)}
@@ -23,19 +24,18 @@ MONTHLY:
 Active CPs (last 30 days): {active_cp}
 
 Give:
-1. Key insights
-2. Risks
-3. Broker behavior patterns
-4. Clear actionable recommendations
+- Key insights
+- Risks
+- Trends
+- Actionable recommendations
 
-Use numbers and percentages.
-Keep it sharp and business-focused.
+Be sharp, use numbers, and business language.
 """
 
     response = client.chat.completions.create(
         model="llama3-70b-8192",
         messages=[
-            {"role": "system", "content": "You are a business analyst."},
+            {"role": "system", "content": "You are a real estate strategist."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.3
