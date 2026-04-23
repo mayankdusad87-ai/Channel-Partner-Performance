@@ -16,7 +16,7 @@ if file:
             st.error(f"❌ CIF sheet not found. Available sheets: {excel.sheet_names}")
             st.stop()
 
-        df = pd.read_excel(excel, sheet_name="CIF")
+        df = pd.read_excel(excel, sheet_name="CIF",header=3)
 
         st.success("✅ CIF sheet loaded")
 
