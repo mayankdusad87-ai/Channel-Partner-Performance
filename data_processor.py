@@ -56,12 +56,11 @@ def process_data(df):
 
     df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
 
-    # ---------------- FUNNEL LOGIC (CORRECTED + LOST) ----------------
+    # ---------------- FUNNEL ----------------
     cp_funnel = df_all.groupby(cp_col).apply(
         lambda g: pd.Series({
 
             "Fresh_Walkins": g[g[visit_col].str.contains("first", na=False)].shape[0],
-
             "Revisits": g[g[visit_col].str.contains("revisit", na=False)].shape[0],
 
             "Hot": g[
@@ -96,15 +95,6 @@ def process_data(df):
 
     cp_funnel = cp_funnel.round(2)
 
-    # ---------------- OPTIONAL VALIDATION ----------------
-    cp_funnel["Funnel_Check"] = (
-        cp_funnel["Hot"] +
-        cp_funnel["Warm"] +
-        cp_funnel["Cold"] +
-        cp_funnel["Lost"]
-    )
-
-    # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
     # ---------------- MONTHLY ----------------
@@ -119,11 +109,19 @@ def process_data(df):
 
     monthly = monthly.round(2)
 
-    # ---------------- ACTIVE CP ----------------
+    # ---------------- ACTIVE CP (FINAL LOGIC) ----------------
     last_30 = df_valid[
         df_valid["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)
     ]
 
-    active_cp = last_30[cp_col].nunique()
+    active_cp_df = last_30[
+        last_30[visit_col].str.contains("first", na=False)
+    ][[cp_col, "Date"]]
 
-    return summary, monthly, cp_funnel, active_cp
+    active_cp_df = active_cp_df.sort_values(by="Date", ascending=False)
+
+    active_cp_df = active_cp_df.drop_duplicates(subset=[cp_col])
+
+    active_cp_count = active_cp_df[cp_col].nunique()
+
+    return summary, monthly, cp_funnel, active_cp_count, active_cp_df
