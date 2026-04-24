@@ -58,14 +58,32 @@ def process_data(df):
     df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
 
     # ---------------- FUNNEL ----------------
-    cp_funnel = df_all.groupby(cp_col).agg(
-        Fresh_Walkins=(visit_col, lambda x: x.str.contains("first", na=False).sum()),
-        Revisits=(visit_col, lambda x: x.str.contains("revisit", na=False).sum()),
-        Hot=(affinity_col, lambda x: x.str.contains("hot", na=False).sum()),
-        Warm=(affinity_col, lambda x: x.str.contains("warm", na=False).sum()),
-        Cold=(affinity_col, lambda x: x.str.contains("cold", na=False).sum()),
-        Bookings=(booking_col, lambda x: (x == "Y").sum())
-    ).reset_index()
+    cp_funnel = df_all.groupby(cp_col).apply(
+    lambda group: pd.Series({
+
+        "Fresh_Walkins": group[visit_col].str.contains("first", na=False).sum(),
+
+        "Revisits": group[visit_col].str.contains("revisit", na=False).sum(),
+
+        "Hot": group[
+            (group[visit_col].str.contains("first", na=False)) &
+            (group[affinity_col].str.contains("hot", na=False))
+        ].shape[0],
+
+        "Warm": group[
+            (group[visit_col].str.contains("first", na=False)) &
+            (group[affinity_col].str.contains("warm", na=False))
+        ].shape[0],
+
+        "Cold": group[
+            (group[visit_col].str.contains("first", na=False)) &
+            (group[affinity_col].str.contains("cold", na=False))
+        ].shape[0],
+
+        "Bookings": (group[booking_col] == "Y").sum()
+
+    })
+).reset_index()
 
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
