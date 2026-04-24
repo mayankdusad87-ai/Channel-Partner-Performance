@@ -21,18 +21,18 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
-    # ---------------- CLEAN STRINGS ----------------
-    # 🔥 IMPORTANT FIX FOR VISIT TYPE
+    # ---------------- CLEAN VISIT TYPE ----------------
     df[visit_col] = (
         df[visit_col]
         .fillna("")
         .astype(str)
         .str.lower()
-        .str.replace("\xa0", " ", regex=True)   # hidden space fix
-        .str.replace("\n", " ", regex=True)     # line break fix
+        .str.replace("\xa0", " ", regex=True)
+        .str.replace("\n", " ", regex=True)
         .str.strip()
     )
 
+    # ---------------- CLEAN OTHER FIELDS ----------------
     df[booking_col] = (
         df[booking_col]
         .fillna("")
@@ -49,18 +49,15 @@ def process_data(df):
         .str.strip()
     )
 
-    # ---------------- DATE HANDLING ----------------
+    # ---------------- DATE ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
 
-    # Keep all rows for CP logic
     df_all = df.copy()
-
-    # Use only valid dates for time-based analysis
     df_valid = df[df["Date"].notna()].copy()
 
     df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
 
-    # ---------------- FUNNEL (FIXED LOGIC) ----------------
+    # ---------------- FUNNEL ----------------
     cp_funnel = df_all.groupby(cp_col).agg(
         Fresh_Walkins=(visit_col, lambda x: x.str.contains("first", na=False).sum()),
         Revisits=(visit_col, lambda x: x.str.contains("revisit", na=False).sum()),
@@ -70,14 +67,12 @@ def process_data(df):
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
-    # ---------------- METRICS ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
 
     cp_funnel = cp_funnel.round(2)
 
-    # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
     # ---------------- MONTHLY ----------------
@@ -99,7 +94,4 @@ def process_data(df):
 
     active_cp = last_30[cp_col].nunique()
 
-    # ---------------- DEBUG (optional) ----------------
-    # print("Unique Visit Types:", df[visit_col].unique())
-
-    return summary, monthly, cp_funnel, active_cp    return summary, monthly, cp_funnel, active_cp
+    return summary, monthly, cp_funnel, active_cp
