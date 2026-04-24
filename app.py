@@ -30,7 +30,7 @@ if file:
             "🧠 AI Insights"
         ])
 
-        # TOP PERFORMERS
+        # ================= TOP PERFORMERS =================
         with tabs[0]:
             top = summary.copy()
             top["Score"] = (
@@ -42,68 +42,86 @@ if file:
             top = top.reset_index(drop=True)
             top.insert(0, "Rank", top.index + 1)
 
+            st.subheader("Top Channel Partners")
             st.dataframe(top)
 
-        # FUNNEL
+        # ================= FUNNEL =================
         with tabs[1]:
+            st.subheader("Funnel View")
             st.dataframe(cp_funnel)
 
-        # MONTHLY
+        # ================= MONTHLY =================
         with tabs[2]:
+            st.subheader("Monthly Summary")
+
             latest = monthly.sort_values("Month").iloc[-1:]
+            st.write("Latest Month")
             st.dataframe(latest)
+
+            st.write("Trend")
             st.line_chart(monthly.set_index("Month")[["Fresh", "Bookings"]])
 
-        # UNDERPERFORMERS
+        # ================= UNDERPERFORMERS =================
         with tabs[3]:
+            st.subheader("Underperforming CPs")
+
             risk = summary[
                 (summary["Fresh_Walkins"] > 20) &
                 (summary["Conversion %"] < 5)
             ]
+
             st.dataframe(risk)
 
-        # NETWORK HEALTH
+        # ================= NETWORK HEALTH =================
         with tabs[4]:
 
-    st.subheader("📊 Network Health")
+            st.subheader("📊 Network Health")
 
-    # ---- Top 5 Contribution ----
-    total_bookings = summary["Bookings"].sum()
+            # ---- Top 5 Contribution ----
+            total_bookings = summary["Bookings"].sum()
 
-    if total_bookings > 0:
-        top5 = summary.sort_values(by="Bookings", ascending=False).head(5)
-        contribution = (top5["Bookings"].sum() / total_bookings) * 100
-    else:
-        contribution = 0
+            if total_bookings > 0:
+                top5 = summary.sort_values(by="Bookings", ascending=False).head(5)
+                contribution = (top5["Bookings"].sum() / total_bookings) * 100
+            else:
+                contribution = 0
 
-    st.metric("Top 5 Contribution %", round(contribution, 2))
+            st.metric("Top 5 Contribution %", round(contribution, 2))
 
-    # ---- Active CPs ----
-    st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
+            # ---- Active CP ----
+            st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
 
-    st.metric("Total Active CPs", active_cp)
+            st.metric("Total Active CPs", active_cp)
 
-    # ✅ Show ONLY UNIQUE CP names
-    cp_column_name = active_cp_df.columns[0]
+            # Extract CP column dynamically
+            cp_column_name = active_cp_df.columns[0]
 
-    unique_cp_names = (
-        active_cp_df[[cp_column_name]]
-        .dropna()
-        .drop_duplicates()
-        .sort_values(by=cp_column_name)
-    )
+            unique_cp_names = (
+                active_cp_df[[cp_column_name]]
+                .dropna()
+                .drop_duplicates()
+                .sort_values(by=cp_column_name)
+            )
 
-    st.dataframe(unique_cp_names.reset_index(drop=True))
-        # AI
+            st.dataframe(unique_cp_names.reset_index(drop=True))
+
+        # ================= AI INSIGHTS =================
         with tabs[5]:
+            st.subheader("AI Insights")
+
             if st.button("Generate AI Insights"):
                 insights = generate_insights(summary, monthly, cp_funnel)
+
                 st.write(insights)
 
                 ppt = create_ppt(insights, summary, cp_funnel)
 
                 with open(ppt, "rb") as f:
-                    st.download_button("Download PPT", f, file_name="Strategy_Report.pptx")
+                    st.download_button(
+                        "Download Strategy PPT",
+                        f,
+                        file_name="Strategy_Report.pptx"
+                    )
 
     except Exception as e:
         st.error(str(e))
