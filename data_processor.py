@@ -21,7 +21,7 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
-    # ---------------- CLEAN CHANNEL PARTNER ----------------
+    # ---------------- CLEAN DATA ----------------
     df[cp_col] = (
         df[cp_col]
         .fillna("")
@@ -32,7 +32,6 @@ def process_data(df):
         .str.strip()
     )
 
-    # ---------------- CLEAN VISIT TYPE ----------------
     df[visit_col] = (
         df[visit_col]
         .fillna("")
@@ -44,7 +43,6 @@ def process_data(df):
         .str.strip()
     )
 
-    # ---------------- CLEAN OTHER FIELDS ----------------
     df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
     df[affinity_col] = df[affinity_col].fillna("").astype(str).str.lower().str.strip()
 
@@ -88,10 +86,50 @@ def process_data(df):
         })
     ).reset_index()
 
-    # ---------------- METRICS ----------------
+    # ---------------- CORE METRICS ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
+
+    cp_funnel["Fresh_to_Hot %"] = (
+        cp_funnel["Hot"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
+    ) * 100
+
+    cp_funnel["Hot_to_Booking %"] = (
+        cp_funnel["Bookings"] / cp_funnel["Hot"].replace(0, 1)
+    ) * 100
+
+    cp_funnel["Productivity"] = (
+        cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
+    )
+
+    cp_funnel["Quality Score"] = (
+        cp_funnel["Hot"] * 2 +
+        cp_funnel["Warm"] * 1 -
+        cp_funnel["Cold"] * 1 -
+        cp_funnel["Lost"] * 2
+    )
+
+    cp_funnel["Leakage"] = (
+        cp_funnel["Fresh_Walkins"] -
+        (cp_funnel["Hot"] + cp_funnel["Warm"] + cp_funnel["Cold"] + cp_funnel["Lost"])
+    )
+
+    # ---------------- DYNAMIC SEGMENTATION ----------------
+    fresh_median = cp_funnel["Fresh_Walkins"].median()
+    conv_median = cp_funnel["Conversion %"].median()
+
+    def classify(row):
+        if row["Fresh_Walkins"] >= fresh_median and row["Conversion %"] >= conv_median:
+            return "High Volume - High Conversion"
+        elif row["Fresh_Walkins"] >= fresh_median and row["Conversion %"] < conv_median:
+            return "High Volume - Low Conversion"
+        elif row["Fresh_Walkins"] < fresh_median and row["Conversion %"] >= conv_median:
+            return "Low Volume - High Conversion"
+        else:
+            return "Low Volume - Low Conversion"
+
+    cp_funnel["Segment"] = cp_funnel.apply(classify, axis=1)
 
     cp_funnel = cp_funnel.round(2)
 
@@ -109,7 +147,7 @@ def process_data(df):
 
     monthly = monthly.round(2)
 
-    # ---------------- ACTIVE CP (FINAL LOGIC) ----------------
+    # ---------------- ACTIVE CP ----------------
     last_30 = df_valid[
         df_valid["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)
     ]
@@ -119,7 +157,6 @@ def process_data(df):
     ][[cp_col, "Date"]]
 
     active_cp_df = active_cp_df.sort_values(by="Date", ascending=False)
-
     active_cp_df = active_cp_df.drop_duplicates(subset=[cp_col])
 
     active_cp_count = active_cp_df[cp_col].nunique()
