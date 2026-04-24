@@ -21,6 +21,17 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
+    # ---------------- CLEAN CHANNEL PARTNER ----------------
+    df[cp_col] = (
+        df[cp_col]
+        .fillna("")
+        .astype(str)
+        .str.upper()
+        .str.replace("\xa0", " ", regex=True)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
+
     # ---------------- CLEAN VISIT TYPE ----------------
     df[visit_col] = (
         df[visit_col]
@@ -29,25 +40,13 @@ def process_data(df):
         .str.lower()
         .str.replace("\xa0", " ", regex=True)
         .str.replace("\n", " ", regex=True)
+        .str.replace(r"\s+", " ", regex=True)
         .str.strip()
     )
 
     # ---------------- CLEAN OTHER FIELDS ----------------
-    df[booking_col] = (
-        df[booking_col]
-        .fillna("")
-        .astype(str)
-        .str.upper()
-        .str.strip()
-    )
-
-    df[affinity_col] = (
-        df[affinity_col]
-        .fillna("")
-        .astype(str)
-        .str.lower()
-        .str.strip()
-    )
+    df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
+    df[affinity_col] = df[affinity_col].fillna("").astype(str).str.lower().str.strip()
 
     # ---------------- DATE ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
@@ -57,34 +56,35 @@ def process_data(df):
 
     df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
 
-    # ---------------- FUNNEL ----------------
+    # ---------------- FUNNEL LOGIC (CORRECTED) ----------------
     cp_funnel = df_all.groupby(cp_col).apply(
-    lambda group: pd.Series({
+        lambda g: pd.Series({
 
-        "Fresh_Walkins": group[visit_col].str.contains("first", na=False).sum(),
+            "Fresh_Walkins": g[g[visit_col].str.contains("first", na=False)].shape[0],
 
-        "Revisits": group[visit_col].str.contains("revisit", na=False).sum(),
+            "Revisits": g[g[visit_col].str.contains("revisit", na=False)].shape[0],
 
-        "Hot": group[
-            (group[visit_col].str.contains("first", na=False)) &
-            (group[affinity_col].str.contains("hot", na=False))
-        ].shape[0],
+            "Hot": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("hot", na=False))
+            ].shape[0],
 
-        "Warm": group[
-            (group[visit_col].str.contains("first", na=False)) &
-            (group[affinity_col].str.contains("warm", na=False))
-        ].shape[0],
+            "Warm": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("warm", na=False))
+            ].shape[0],
 
-        "Cold": group[
-            (group[visit_col].str.contains("first", na=False)) &
-            (group[affinity_col].str.contains("cold", na=False))
-        ].shape[0],
+            "Cold": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("cold", na=False))
+            ].shape[0],
 
-        "Bookings": (group[booking_col] == "Y").sum()
+            "Bookings": (g[booking_col] == "Y").sum()
 
-    })
-).reset_index()
+        })
+    ).reset_index()
 
+    # ---------------- METRICS ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
