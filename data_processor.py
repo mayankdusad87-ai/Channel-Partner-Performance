@@ -56,38 +56,38 @@ def process_data(df):
 
     df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
 
-    # ---------------- FUNNEL LOGIC (CORRECTED) ----------------
-cp_funnel = df_all.groupby(cp_col).apply(
-    lambda g: pd.Series({
+    # ---------------- FUNNEL LOGIC (CORRECTED + LOST) ----------------
+    cp_funnel = df_all.groupby(cp_col).apply(
+        lambda g: pd.Series({
 
-        "Fresh_Walkins": g[g[visit_col].str.contains("first", na=False)].shape[0],
+            "Fresh_Walkins": g[g[visit_col].str.contains("first", na=False)].shape[0],
 
-        "Revisits": g[g[visit_col].str.contains("revisit", na=False)].shape[0],
+            "Revisits": g[g[visit_col].str.contains("revisit", na=False)].shape[0],
 
-        "Hot": g[
-            (g[visit_col].str.contains("first", na=False)) &
-            (g[affinity_col].str.contains("hot", na=False))
-        ].shape[0],
+            "Hot": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("hot", na=False))
+            ].shape[0],
 
-        "Warm": g[
-            (g[visit_col].str.contains("first", na=False)) &
-            (g[affinity_col].str.contains("warm", na=False))
-        ].shape[0],
+            "Warm": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("warm", na=False))
+            ].shape[0],
 
-        "Cold": g[
-            (g[visit_col].str.contains("first", na=False)) &
-            (g[affinity_col].str.contains("cold", na=False))
-        ].shape[0],
+            "Cold": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("cold", na=False))
+            ].shape[0],
 
-        "Lost": g[
-            (g[visit_col].str.contains("first", na=False)) &
-            (g[affinity_col].str.contains("lost", na=False))
-        ].shape[0],
+            "Lost": g[
+                (g[visit_col].str.contains("first", na=False)) &
+                (g[affinity_col].str.contains("lost", na=False))
+            ].shape[0],
 
-        "Bookings": (g[booking_col] == "Y").sum()
+            "Bookings": (g[booking_col] == "Y").sum()
 
-    })
-).reset_index()
+        })
+    ).reset_index()
 
     # ---------------- METRICS ----------------
     cp_funnel["Conversion %"] = (
@@ -96,6 +96,15 @@ cp_funnel = df_all.groupby(cp_col).apply(
 
     cp_funnel = cp_funnel.round(2)
 
+    # ---------------- OPTIONAL VALIDATION ----------------
+    cp_funnel["Funnel_Check"] = (
+        cp_funnel["Hot"] +
+        cp_funnel["Warm"] +
+        cp_funnel["Cold"] +
+        cp_funnel["Lost"]
+    )
+
+    # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
     # ---------------- MONTHLY ----------------
