@@ -69,7 +69,17 @@ if file:
             contribution = (top5["Bookings"].sum() / total_bookings) * 100
 
             st.metric("Top 5 Contribution %", round(contribution, 2))
-            st.metric("Active CPs (Last 30 Days)", active_cp)
+           with tabs[4]:
+
+              st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
+
+              # Show count
+              st.metric("Total Active CPs", active_cp)
+
+              # Show UNIQUE CP names
+              unique_cp_names = active_cp_df[[active_cp_df.columns[0]]].drop_duplicates()
+
+             st.dataframe(unique_cp_names.reset_index(drop=True))
 
         # AI
         with tabs[5]:
