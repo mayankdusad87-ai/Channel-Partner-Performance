@@ -19,7 +19,7 @@ if file:
 
         df = pd.read_excel(excel, sheet_name="CIF", header=3)
 
-        summary, monthly, cp_funnel, active_cp = process_data(df)
+        summary, monthly, cp_funnel, active_cp, active_cp_df = process_data(df)
 
         tabs = st.tabs([
             "🏆 Top Performers",
