@@ -21,31 +21,56 @@ def process_data(df):
     if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
         raise Exception("❌ Required columns missing in CIF sheet")
 
-    # ---------------- STRING CLEANING ----------------
-    df[visit_col] = df[visit_col].fillna("").astype(str).str.lower().str.strip()
-    df[booking_col] = df[booking_col].fillna("").astype(str).str.upper().str.strip()
-    df[affinity_col] = df[affinity_col].fillna("").astype(str).str.lower().str.strip()
+    # ---------------- CLEAN STRINGS ----------------
+    # 🔥 IMPORTANT FIX FOR VISIT TYPE
+    df[visit_col] = (
+        df[visit_col]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+        .str.replace("\xa0", " ", regex=True)   # hidden space fix
+        .str.replace("\n", " ", regex=True)     # line break fix
+        .str.strip()
+    )
 
-    # ---------------- DATE PARSING (SAFE) ----------------
+    df[booking_col] = (
+        df[booking_col]
+        .fillna("")
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    df[affinity_col] = (
+        df[affinity_col]
+        .fillna("")
+        .astype(str)
+        .str.lower()
+        .str.strip()
+    )
+
+    # ---------------- DATE HANDLING ----------------
     df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
 
-    # 👉 Split data:
-    df_valid_dates = df[df["Date"].notna()].copy()   # for monthly
-    df_all = df.copy()                               # for CP analysis (NO DROPS)
+    # Keep all rows for CP logic
+    df_all = df.copy()
 
-    # ---------------- MONTH (ONLY VALID DATES) ----------------
-    df_valid_dates["Month"] = df_valid_dates["Date"].dt.to_period("M").astype(str)
+    # Use only valid dates for time-based analysis
+    df_valid = df[df["Date"].notna()].copy()
 
-    # ---------------- FUNNEL (USE FULL DATA) ----------------
+    df_valid["Month"] = df_valid["Date"].dt.to_period("M").astype(str)
+
+    # ---------------- FUNNEL (FIXED LOGIC) ----------------
     cp_funnel = df_all.groupby(cp_col).agg(
-        Fresh_Walkins=(visit_col, lambda x: (x == "first visit").sum()),
-        Revisits=(visit_col, lambda x: (x == "revisit").sum()),
-        Hot=(affinity_col, lambda x: (x == "hot").sum()),
-        Warm=(affinity_col, lambda x: (x == "warm").sum()),
-        Cold=(affinity_col, lambda x: (x == "cold").sum()),
+        Fresh_Walkins=(visit_col, lambda x: x.str.contains("first", na=False).sum()),
+        Revisits=(visit_col, lambda x: x.str.contains("revisit", na=False).sum()),
+        Hot=(affinity_col, lambda x: x.str.contains("hot", na=False).sum()),
+        Warm=(affinity_col, lambda x: x.str.contains("warm", na=False).sum()),
+        Cold=(affinity_col, lambda x: x.str.contains("cold", na=False).sum()),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
 
+    # ---------------- METRICS ----------------
     cp_funnel["Conversion %"] = (
         cp_funnel["Bookings"] / cp_funnel["Fresh_Walkins"].replace(0, 1)
     ) * 100
@@ -55,8 +80,8 @@ def process_data(df):
     # ---------------- SUMMARY ----------------
     summary = cp_funnel.copy()
 
-    # ---------------- MONTHLY (ONLY VALID DATES) ----------------
-    monthly = df_valid_dates.groupby("Month").agg(
+    # ---------------- MONTHLY ----------------
+    monthly = df_valid.groupby("Month").agg(
         Fresh=("Date", "count"),
         Bookings=(booking_col, lambda x: (x == "Y").sum())
     ).reset_index()
@@ -67,16 +92,14 @@ def process_data(df):
 
     monthly = monthly.round(2)
 
-    # ---------------- ACTIVE CP (ONLY VALID DATES) ----------------
-    last_30 = df_valid_dates[
-        df_valid_dates["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)
+    # ---------------- ACTIVE CP ----------------
+    last_30 = df_valid[
+        df_valid["Date"] >= pd.Timestamp.today() - pd.Timedelta(days=30)
     ]
 
     active_cp = last_30[cp_col].nunique()
 
-    # ---------------- DATA QUALITY WARNING ----------------
-    invalid_dates = df["Date"].isna().sum()
-    if invalid_dates > 0:
-        print(f"⚠️ {invalid_dates} rows had invalid dates (excluded from monthly, included in CP analysis)")
+    # ---------------- DEBUG (optional) ----------------
+    # print("Unique Visit Types:", df[visit_col].unique())
 
-    return summary, monthly, cp_funnel, active_cp
+    return summary, monthly, cp_funnel, active_cp    return summary, monthly, cp_funnel, active_cp
