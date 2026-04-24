@@ -64,23 +64,36 @@ if file:
 
         # NETWORK HEALTH
         with tabs[4]:
-            total_bookings = summary["Bookings"].sum()
-            top5 = summary.sort_values(by="Bookings", ascending=False).head(5)
-            contribution = (top5["Bookings"].sum() / total_bookings) * 100
 
-            st.metric("Top 5 Contribution %", round(contribution, 2))
-        with tabs[4]:
+    st.subheader("📊 Network Health")
 
-              st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
+    # ---- Top 5 Contribution ----
+    total_bookings = summary["Bookings"].sum()
 
-              # Show count
-              st.metric("Total Active CPs", active_cp)
+    if total_bookings > 0:
+        top5 = summary.sort_values(by="Bookings", ascending=False).head(5)
+        contribution = (top5["Bookings"].sum() / total_bookings) * 100
+    else:
+        contribution = 0
 
-              # Show UNIQUE CP names
-              unique_cp_names = active_cp_df[[active_cp_df.columns[0]]].drop_duplicates()
+    st.metric("Top 5 Contribution %", round(contribution, 2))
 
-             st.dataframe(unique_cp_names.reset_index(drop=True))
+    # ---- Active CPs ----
+    st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
 
+    st.metric("Total Active CPs", active_cp)
+
+    # ✅ Show ONLY UNIQUE CP names
+    cp_column_name = active_cp_df.columns[0]
+
+    unique_cp_names = (
+        active_cp_df[[cp_column_name]]
+        .dropna()
+        .drop_duplicates()
+        .sort_values(by=cp_column_name)
+    )
+
+    st.dataframe(unique_cp_names.reset_index(drop=True))
         # AI
         with tabs[5]:
             if st.button("Generate AI Insights"):
