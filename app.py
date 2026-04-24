@@ -69,7 +69,7 @@ if file:
             contribution = (top5["Bookings"].sum() / total_bookings) * 100
 
             st.metric("Top 5 Contribution %", round(contribution, 2))
-           with tabs[4]:
+        with tabs[4]:
 
               st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
 
