@@ -1,40 +1,35 @@
-import os
-from groq import Groq
+def generate_insights(summary, monthly):
 
-def generate_insights(summary, monthly, cp_funnel):
+    total_bookings = summary["Bookings"].sum()
+    top5 = summary.sort_values("Bookings", ascending=False).head(5)
 
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    contribution = (top5["Bookings"].sum()/total_bookings)*100 if total_bookings else 0
 
-    prompt = f"""
-You are a senior real estate sourcing strategist working with Lodha group
+    scale = summary[summary["Strategy"]=="SCALE"].shape[0]
+    fix = summary[summary["Strategy"]=="FIX"].shape[0]
+    drop = summary[summary["Strategy"]=="DROP"].shape[0]
 
-DATA:
+    insights = f"""
+EXECUTIVE SUMMARY
+- Top 5 CPs contribute {round(contribution,1)}% of bookings → dependency risk
+- {scale} CPs can be scaled immediately
+- {fix} CPs need fixing (conversion issues)
+- {drop} CPs are underperforming → rationalize network
 
-FUNNEL PERFORMANCE:
-{cp_funnel.to_string(index=False)}
+NETWORK DIAGNOSIS
+- Major leakage at Fresh → Booking stage
+- Lead quality vs closing mismatch observed
 
-MONTHLY PERFORMANCE:
-{monthly.to_string(index=False)}
+STRATEGY
+- SCALE: High conversion + volume → double down
+- FIX: High walk-ins but poor conversion → sales issue
+- INCUBATE: Good conversion but low volume → push leads
+- DROP: Low contribution → reduce bandwidth
 
-Analyze deeply:
-
-1. Which CPs are top performers and WHY
-2. Which CPs are underperforming and WHY
-3. Role of Hot/Warm/Cold mix in performance
-4. Any inefficiencies in conversion funnel
-5. Dependency risks in CP network
-
-Give output in this format:
-
-- Key Insights
-- Risks
-- Recommended Actions (very specific, actionable)
+MANAGEMENT ACTIONS
+- Reallocate inventory to top CPs
+- Introduce CP performance review weekly
+- Incentivize conversion, not just walk-ins
 """
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-
-    return response.choices[0].message.content
+    return insights
