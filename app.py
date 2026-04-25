@@ -14,135 +14,75 @@ if file:
         excel = pd.ExcelFile(file)
 
         if "CIF" not in excel.sheet_names:
-            st.error(f"❌ CIF sheet not found. Available: {excel.sheet_names}")
+            st.error("❌ CIF sheet missing")
             st.stop()
 
         df = pd.read_excel(excel, sheet_name="CIF", header=3)
 
-        # 🔥 NEW ENGINE OUTPUT
         summary, monthly = process_data(df)
 
         tabs = st.tabs([
-            "🏆 Top Performers",
-            "📊 Funnel & Diagnostics",
-            "📅 Monthly Trend",
-            "⚠️ Problem CPs",
-            "📊 Network Health",
-            "🎯 Strategy & Actions",
-            "🧠 Management Insights"
+            "🏆 Top CPs",
+            "📊 Diagnostics",
+            "📅 Monthly",
+            "⚠️ Risk CPs",
+            "📊 Network",
+            "🎯 Strategy",
+            "🧠 Insights"
         ])
 
-        # ================= TOP PERFORMERS =================
+        # TOP
         with tabs[0]:
-            st.subheader("Top Channel Partners")
-
-            top = summary.copy()
-            top["Score"] = (
-                top["Conversion %"] * 0.5 +
-                top["Bookings"] * 0.3 +
-                top["Hot %"] * 0.2
-            )
-
-            top = top.sort_values(by="Score", ascending=False).head(10)
-            top = top.reset_index(drop=True)
-            top.insert(0, "Rank", top.index + 1)
-
+            top = summary.sort_values("Bookings", ascending=False).head(10)
             st.dataframe(top)
 
-        # ================= FUNNEL & DIAGNOSTICS =================
+        # DIAGNOSTICS
         with tabs[1]:
-            st.subheader("Funnel Diagnostics (Per CP)")
+            st.dataframe(summary)
 
-            cols = [
-                summary.columns[0],  # CP name
-                "Fresh", "Hot", "Warm", "Cold",
-                "Bookings", "Conversion %",
-                "Hot %", "Hot→Booking %",
-                "Problem"
-            ]
-
-            st.dataframe(summary[cols])
-
-        # ================= MONTHLY =================
+        # MONTHLY
         with tabs[2]:
-            st.subheader("Monthly Performance")
+            st.dataframe(monthly)
 
-            latest = monthly.sort_values("Month").iloc[-1:]
-            st.write("Latest Month Snapshot")
-            st.dataframe(latest)
+            if len(monthly) > 1:
+                latest = monthly.iloc[-1]
+                prev = monthly.iloc[-2]
 
-            st.write("Trend")
-            st.line_chart(monthly.set_index("Month")[["Fresh", "Bookings"]])
+                st.write(f"Booking change: {latest['Bookings'] - prev['Bookings']}")
 
-        # ================= PROBLEM CP =================
+        # RISK
         with tabs[3]:
-            st.subheader("CPs Needing Attention")
-
-            risk = summary[
-                summary["Strategy"].isin(["FIX", "DROP"])
-            ]
-
+            risk = summary[summary["Strategy"].isin(["FIX","DROP"])]
             st.dataframe(risk)
 
-        # ================= NETWORK HEALTH =================
+        # NETWORK
         with tabs[4]:
-            st.subheader("📊 Network Health")
+            total = summary["Bookings"].sum()
+            top5 = summary.sort_values("Bookings", ascending=False).head(5)
 
-            total_bookings = summary["Bookings"].sum()
+            contribution = (top5["Bookings"].sum()/total)*100 if total else 0
 
-            if total_bookings > 0:
-                top5 = summary.sort_values(by="Bookings", ascending=False).head(5)
-                contribution = (top5["Bookings"].sum() / total_bookings) * 100
-            else:
-                contribution = 0
+            st.metric("Top 5 Contribution %", round(contribution,2))
 
-            st.metric("Top 5 Contribution %", round(contribution, 2))
+            if contribution > 60:
+                st.error("High dependency risk")
 
-            # Strategy split
-            st.subheader("Strategy Split")
             st.bar_chart(summary["Strategy"].value_counts())
 
-            # Lifecycle
-            st.metric("Project Lifecycle", summary["Lifecycle"].iloc[0])
-
-        # ================= STRATEGY =================
+        # STRATEGY
         with tabs[5]:
-            st.subheader("CP Strategy & Actions")
+            st.dataframe(summary[["Channel Partner","Strategy","Action"]])
 
-            st.dataframe(
-                summary[[
-                    summary.columns[0],
-                    "Strategy",
-                    "Problem",
-                    "Action"
-                ]]
-            )
-
-            # 🔥 Highlight SCALE CPs
-            st.subheader("🚀 Scale Immediately")
-            st.dataframe(summary[summary["Strategy"] == "SCALE"])
-
-            # 🔥 Highlight FIX CPs
-            st.subheader("🛠 Fix Immediately")
-            st.dataframe(summary[summary["Strategy"] == "FIX"])
-
-        # ================= MANAGEMENT INSIGHTS =================
+        # INSIGHTS
         with tabs[6]:
-            st.subheader("🧠 Management Insights")
-
-            if st.button("Generate Strategy Insights"):
+            if st.button("Generate Insights"):
                 insights = generate_insights(summary, monthly)
-
                 st.write(insights)
 
                 ppt = create_ppt(insights, summary)
 
                 with open(ppt, "rb") as f:
-                    st.download_button(
-                        "📥 Download Strategy PPT",
-                        f,
-                        file_name="Strategy_Report.pptx"
-                    )
+                    st.download_button("Download PPT", f)
 
     except Exception as e:
         st.error(str(e))
