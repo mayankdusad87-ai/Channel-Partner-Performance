@@ -5,7 +5,7 @@ from insights_engine import generate_insights
 from report_generator import create_ppt
 
 st.set_page_config(layout="wide")
-st.title("🏢 Channel Partner Performance Intelligence")
+st.title("🏢 Channel Partner Strategy Engine")
 
 file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
@@ -19,65 +19,75 @@ if file:
 
         df = pd.read_excel(excel, sheet_name="CIF", header=3)
 
-        summary, monthly, cp_funnel, active_cp, active_cp_df = process_data(df)
+        # 🔥 NEW ENGINE OUTPUT
+        summary, monthly = process_data(df)
 
         tabs = st.tabs([
             "🏆 Top Performers",
-            "📊 Funnel View",
-            "📅 Monthly Summary",
-            "⚠️ Underperformers",
+            "📊 Funnel & Diagnostics",
+            "📅 Monthly Trend",
+            "⚠️ Problem CPs",
             "📊 Network Health",
-            "🧠 AI Insights"
+            "🎯 Strategy & Actions",
+            "🧠 Management Insights"
         ])
 
         # ================= TOP PERFORMERS =================
         with tabs[0]:
+            st.subheader("Top Channel Partners")
+
             top = summary.copy()
             top["Score"] = (
-                top["Conversion %"] * 0.4 +
-                top["Bookings"] * 0.4 +
-                top["Hot"] * 0.2
+                top["Conversion %"] * 0.5 +
+                top["Bookings"] * 0.3 +
+                top["Hot %"] * 0.2
             )
+
             top = top.sort_values(by="Score", ascending=False).head(10)
             top = top.reset_index(drop=True)
             top.insert(0, "Rank", top.index + 1)
 
-            st.subheader("Top Channel Partners")
             st.dataframe(top)
 
-        # ================= FUNNEL =================
+        # ================= FUNNEL & DIAGNOSTICS =================
         with tabs[1]:
-            st.subheader("Funnel View")
-            st.dataframe(cp_funnel)
+            st.subheader("Funnel Diagnostics (Per CP)")
+
+            cols = [
+                summary.columns[0],  # CP name
+                "Fresh", "Hot", "Warm", "Cold",
+                "Bookings", "Conversion %",
+                "Hot %", "Hot→Booking %",
+                "Problem"
+            ]
+
+            st.dataframe(summary[cols])
 
         # ================= MONTHLY =================
         with tabs[2]:
-            st.subheader("Monthly Summary")
+            st.subheader("Monthly Performance")
 
             latest = monthly.sort_values("Month").iloc[-1:]
-            st.write("Latest Month")
+            st.write("Latest Month Snapshot")
             st.dataframe(latest)
 
             st.write("Trend")
             st.line_chart(monthly.set_index("Month")[["Fresh", "Bookings"]])
 
-        # ================= UNDERPERFORMERS =================
+        # ================= PROBLEM CP =================
         with tabs[3]:
-            st.subheader("Underperforming CPs")
+            st.subheader("CPs Needing Attention")
 
             risk = summary[
-                (summary["Fresh_Walkins"] > 20) &
-                (summary["Conversion %"] < 5)
+                summary["Strategy"].isin(["FIX", "DROP"])
             ]
 
             st.dataframe(risk)
 
         # ================= NETWORK HEALTH =================
         with tabs[4]:
-
             st.subheader("📊 Network Health")
 
-            # ---- Top 5 Contribution ----
             total_bookings = summary["Bookings"].sum()
 
             if total_bookings > 0:
@@ -88,37 +98,48 @@ if file:
 
             st.metric("Top 5 Contribution %", round(contribution, 2))
 
-            # ---- Active CP ----
-            st.subheader("Active CPs (Last 30 Days - Fresh Walk-ins)")
+            # Strategy split
+            st.subheader("Strategy Split")
+            st.bar_chart(summary["Strategy"].value_counts())
 
-            st.metric("Total Active CPs", active_cp)
+            # Lifecycle
+            st.metric("Project Lifecycle", summary["Lifecycle"].iloc[0])
 
-            # Extract CP column dynamically
-            cp_column_name = active_cp_df.columns[0]
+        # ================= STRATEGY =================
+        with tabs[5]:
+            st.subheader("CP Strategy & Actions")
 
-            unique_cp_names = (
-                active_cp_df[[cp_column_name]]
-                .dropna()
-                .drop_duplicates()
-                .sort_values(by=cp_column_name)
+            st.dataframe(
+                summary[[
+                    summary.columns[0],
+                    "Strategy",
+                    "Problem",
+                    "Action"
+                ]]
             )
 
-            st.dataframe(unique_cp_names.reset_index(drop=True))
+            # 🔥 Highlight SCALE CPs
+            st.subheader("🚀 Scale Immediately")
+            st.dataframe(summary[summary["Strategy"] == "SCALE"])
 
-        # ================= AI INSIGHTS =================
-        with tabs[5]:
-            st.subheader("AI Insights")
+            # 🔥 Highlight FIX CPs
+            st.subheader("🛠 Fix Immediately")
+            st.dataframe(summary[summary["Strategy"] == "FIX"])
 
-            if st.button("Generate AI Insights"):
-                insights = generate_insights(summary, monthly, cp_funnel)
+        # ================= MANAGEMENT INSIGHTS =================
+        with tabs[6]:
+            st.subheader("🧠 Management Insights")
+
+            if st.button("Generate Strategy Insights"):
+                insights = generate_insights(summary, monthly)
 
                 st.write(insights)
 
-                ppt = create_ppt(insights, summary, cp_funnel)
+                ppt = create_ppt(insights, summary)
 
                 with open(ppt, "rb") as f:
                     st.download_button(
-                        "Download Strategy PPT",
+                        "📥 Download Strategy PPT",
                         f,
                         file_name="Strategy_Report.pptx"
                     )
