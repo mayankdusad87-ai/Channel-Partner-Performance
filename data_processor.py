@@ -2,40 +2,33 @@ import pandas as pd
 
 def process_data(df):
 
-    df.columns = df.columns.fillna("").astype(str).str.strip()
+    # ---------------- CLEAN COLUMN NAMES ----------------
+    df.columns = df.columns.astype(str).str.strip()
 
-    def find(name):
-        for col in df.columns:
-            if name in col.lower():
-                return col
-        return None
+    # ---------------- FIX COLUMN NAMES ----------------
+    cp_col = "Channel Partner Company*"
+    date_col = [c for c in df.columns if "date" in c.lower()][0]
+    visit_col = [c for c in df.columns if "visit" in c.lower()][0]
+    booking_col = [c for c in df.columns if "booking" in c.lower()][0]
+    affinity_col = [c for c in df.columns if "affinity" in c.lower()][0]
 
-    date_col = find("date of visit")
-    visit_col = find("visit type")
-    cp_col = find("channel partner")
-    booking_col = find("booking done")
-    affinity_col = find("affinity")
-
-    if not all([date_col, visit_col, cp_col, booking_col, affinity_col]):
-        raise Exception("❌ Required columns missing")
-
-    # ---------------- CLEAN ----------------
+    # ---------------- CLEAN DATA ----------------
     df[cp_col] = df[cp_col].astype(str).str.upper().str.strip()
     df[visit_col] = df[visit_col].astype(str).str.lower().str.strip()
     df[booking_col] = df[booking_col].astype(str).str.upper().str.strip()
     df[affinity_col] = df[affinity_col].astype(str).str.lower().str.strip()
 
-    df["Date"] = pd.to_datetime(df[date_col], dayfirst=True, errors="coerce")
+    df["Date"] = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
     df = df[df["Date"].notna()]
 
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
     # ---------------- LIFECYCLE ----------------
-    total_months = df["Month"].nunique()
+    months = df["Month"].nunique()
 
-    if total_months <= 3:
+    if months <= 3:
         lifecycle = "EARLY"
-    elif total_months <= 6:
+    elif months <= 6:
         lifecycle = "GROWTH"
     else:
         lifecycle = "MATURE"
@@ -44,34 +37,32 @@ def process_data(df):
     cp = df.groupby(cp_col).apply(
         lambda g: pd.Series({
             "Fresh": g[g[visit_col].str.contains("first")].shape[0],
-            "Revisit": g[g[visit_col].str.contains("revisit")].shape[0],
             "Hot": g[g[affinity_col].str.contains("hot")].shape[0],
             "Warm": g[g[affinity_col].str.contains("warm")].shape[0],
             "Cold": g[g[affinity_col].str.contains("cold")].shape[0],
-            "Lost": g[g[affinity_col].str.contains("lost")].shape[0],
             "Bookings": (g[booking_col] == "Y").sum()
         })
     ).reset_index()
+
+    cp = cp.rename(columns={cp.columns[0]: "Channel Partner"})
 
     # ---------------- METRICS ----------------
     cp["Conversion %"] = (cp["Bookings"] / cp["Fresh"].replace(0,1))*100
     cp["Hot %"] = (cp["Hot"] / cp["Fresh"].replace(0,1))*100
     cp["Hot→Booking %"] = (cp["Bookings"] / cp["Hot"].replace(0,1))*100
 
-    # ---------------- ROOT CAUSE ----------------
-    def diagnose(row):
+    # ---------------- DIAGNOSIS ----------------
+    def problem(row):
         if row["Fresh"] > 20 and row["Conversion %"] < 5:
             return "CLOSING ISSUE"
-        elif row["Fresh"] > 20 and row["Hot %"] < 20:
+        elif row["Hot %"] < 20:
             return "POOR LEAD QUALITY"
-        elif row["Fresh"] < 10 and row["Conversion %"] > 10:
-            return "LOW VOLUME HIGH QUALITY"
         elif row["Fresh"] < 10:
-            return "INACTIVE CP"
+            return "LOW VOLUME"
         else:
             return "STABLE"
 
-    cp["Problem"] = cp.apply(diagnose, axis=1)
+    cp["Problem"] = cp.apply(problem, axis=1)
 
     # ---------------- STRATEGY ----------------
     def strategy(row):
@@ -79,23 +70,23 @@ def process_data(df):
             return "SCALE"
         elif row["Problem"] == "CLOSING ISSUE":
             return "FIX"
-        elif row["Problem"] == "LOW VOLUME HIGH QUALITY":
+        elif row["Problem"] == "LOW VOLUME":
             return "INCUBATE"
         else:
             return "DROP"
 
     cp["Strategy"] = cp.apply(strategy, axis=1)
 
-    # ---------------- ACTIONS ----------------
+    # ---------------- ACTION ----------------
     def action(row):
         if row["Strategy"] == "SCALE":
-            return "Increase allocation + priority inventory"
+            return "Increase inventory allocation + priority deals"
         elif row["Strategy"] == "FIX":
-            return "Sales training + joint closing support"
+            return "Do joint site visits + closing support"
         elif row["Strategy"] == "INCUBATE":
             return "Increase lead flow + marketing push"
         else:
-            return "Reduce focus / replace"
+            return "Reduce focus / remove from network"
 
     cp["Action"] = cp.apply(action, axis=1)
 
@@ -106,6 +97,7 @@ def process_data(df):
         Fresh=("Date","count"),
         Bookings=(booking_col, lambda x: (x=="Y").sum())
     ).reset_index()
+
     monthly["Conversion %"] = (monthly["Bookings"]/monthly["Fresh"])*100
 
     return cp.round(2), monthly.round(2)
