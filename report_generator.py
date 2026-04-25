@@ -1,41 +1,38 @@
 from pptx import Presentation
 from datetime import datetime
 
-def create_ppt(insights, summary, cp_funnel):
+def create_ppt(insights, summary):
 
     prs = Presentation()
 
-    # ---------------- TITLE ----------------
+    # TITLE
     slide = prs.slides.add_slide(prs.slide_layouts[0])
-    slide.shapes.title.text = "Channel Partner Strategy Report"
+    slide.shapes.title.text = "Channel Partner Strategy Deck"
     slide.placeholders[1].text = str(datetime.now().date())
 
-    # ---------------- INSIGHTS ----------------
+    # EXEC SUMMARY
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Key Insights"
+    slide.shapes.title.text = "Executive Summary"
     slide.placeholders[1].text = insights
 
-    # ---------------- TOP CP ----------------
-    top = summary.sort_values(by="Conversion %", ascending=False).head(5)
+    # NETWORK SPLIT
+    strat = summary["Strategy"].value_counts()
 
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Top Performing CPs"
+    slide.shapes.title.text = "CP Strategy Split"
+    slide.placeholders[1].text = strat.to_string()
+
+    # TOP CP
+    top = summary.sort_values("Bookings", ascending=False).head(5)
+
+    slide = prs.slides.add_slide(prs.slide_layouts[1])
+    slide.shapes.title.text = "Top Performers"
     slide.placeholders[1].text = top.to_string(index=False)
 
-    # ---------------- RISK CP ----------------
-    risk = summary[
-        (summary["Fresh_Walkins"] > 20) &
-        (summary["Conversion %"] < 5)
-    ]
-
+    # ACTION TABLE
     slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Underperforming CPs"
-    slide.placeholders[1].text = risk.to_string(index=False)
-
-    # ---------------- FUNNEL VIEW ----------------
-    slide = prs.slides.add_slide(prs.slide_layouts[1])
-    slide.shapes.title.text = "Lead Quality (Hot/Warm/Cold)"
-    slide.placeholders[1].text = cp_funnel.to_string(index=False)
+    slide.shapes.title.text = "Action Plan"
+    slide.placeholders[1].text = summary[["Channel Partner","Strategy","Action"]].to_string(index=False)
 
     file = "Strategy_Report.pptx"
     prs.save(file)
