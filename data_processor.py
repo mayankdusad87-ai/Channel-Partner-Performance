@@ -36,7 +36,7 @@ def process_data(df):
     # ---------------- FUNNEL ----------------
     cp = df.groupby(cp_col).apply(
         lambda g: pd.Series({
-            "Fresh": g[g[visit_col].str.contains("first")].shape[0],
+            "Fresh": g[visit_col].astype(str).str.lower().str.strip().str.contains("first", na=False).sum(),
             "Hot": g[g[affinity_col].str.contains("hot")].shape[0],
             "Warm": g[g[affinity_col].str.contains("warm")].shape[0],
             "Cold": g[g[affinity_col].str.contains("cold")].shape[0],
